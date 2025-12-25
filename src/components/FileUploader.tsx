@@ -52,12 +52,11 @@ export const FileUploader: React.FC<FileUploaderProps> = ({ onFileSelect, disabl
         disabled={disabled}
       />
       <label htmlFor="file-upload" style={{ cursor: disabled ? 'not-allowed' : 'pointer', display: 'block' }}>
-        {/* Abbiamo sostituito la scritta corrotta con una emoji pulita */}
         <div style={{ fontSize: '3.5rem', marginBottom: '15px', filter: disabled ? 'grayscale(1)' : 'none' }}>
           📂
         </div>
         <h3 style={{ margin: '0 0 5px 0', fontSize: '1.1rem', color: '#1e293b' }}>
-          Clicca o trascina un file
+          Clicca, trascina o <span style={{color: '#2563eb'}}>incolla (Ctrl+V)</span>
         </h3>
         <p style={{ margin: 0, fontSize: '0.9rem', color: '#64748b' }}>
           Video, Audio e Immagini supportati
