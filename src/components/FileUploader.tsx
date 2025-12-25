@@ -1,102 +1,68 @@
-import React, { useState, useCallback } from 'react';
-
-// NOTA: Abbiamo rimosso l'import di 'readAudioFromVideo' perché quella logica
-// ora vive nel Worker FFmpeg e non qui. Questo componente serve solo per l'input.
+// src/components/FileUploader.tsx
+import React, { useState } from 'react';
+import type { ChangeEvent, DragEvent } from 'react';
 
 interface FileUploaderProps {
-  // Callback unificata: restituisce il file grezzo al padre (App.tsx)
   onFileSelect?: (file: File) => void;
-  disabled?: boolean;
+  disabled: boolean;
 }
 
-export function FileUploader({ onFileSelect, disabled }: FileUploaderProps) {
-  const [isDragging, setIsDragging] = useState(false);
+export const FileUploader: React.FC<FileUploaderProps> = ({ onFileSelect, disabled }) => {
+  const [isDragOver, setIsDragOver] = useState(false);
 
-  const processFile = (file: File) => {
-    if (!file || disabled) return;
-
-    // Controllo sicurezza tipi file
-    const isVideo = file.type.startsWith('video/');
-    const isAudio = file.type.startsWith('audio/');
-    const isImage = file.type.startsWith('image/');
-
-    if (!isVideo && !isAudio && !isImage) {
-      alert('Formato non supportato. Carica file Video, Audio o Immagini.');
-      return;
-    }
-
-    // Passiamo il file direttamente al padre.
-    // Sarà App.tsx a decidere se mandarlo al Worker FFmpeg (Audio/Video)
-    // o processarlo nel thread principale (Immagini).
-    if (onFileSelect) {
-      onFileSelect(file);
+  const handleDrop = (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    if (disabled || !onFileSelect) return;
+    
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      onFileSelect(e.dataTransfer.files[0]);
     }
   };
 
-  const onDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(true);
-  }, []);
-
-  const onDragLeave = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-  }, []);
-
-  const onDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      processFile(e.dataTransfer.files[0]);
-    }
-  }, []);
-
-  const onInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      processFile(e.target.files[0]);
+  const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0] && onFileSelect) {
+      onFileSelect(e.target.files[0]);
     }
   };
 
   return (
     <div 
-      onDragOver={!disabled ? onDragOver : undefined}
-      onDragLeave={!disabled ? onDragLeave : undefined}
-      onDrop={!disabled ? onDrop : undefined}
+      onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
+      onDragLeave={() => setIsDragOver(false)}
+      onDrop={handleDrop}
       style={{
-        border: `2px dashed ${isDragging ? '#2563eb' : '#ccc'}`,
+        border: `2px dashed ${isDragOver ? '#2563eb' : '#cbd5e1'}`,
         borderRadius: '16px',
-        padding: '40px',
+        padding: '40px 20px',
         textAlign: 'center',
-        backgroundColor: isDragging ? '#eff6ff' : '#fafafa',
+        backgroundColor: isDragOver ? '#eff6ff' : '#f8fafc',
         cursor: disabled ? 'not-allowed' : 'pointer',
+        transition: 'all 0.2s ease',
         opacity: disabled ? 0.6 : 1,
-        transition: 'all 0.3s ease',
+        marginBottom: '20px',
         marginTop: '20px'
       }}
     >
       <input 
         type="file" 
-        // Accettiamo tutto, poi filtriamo nella logica
-        accept="video/*,audio/*,image/*" 
-        onChange={onInputChange} 
+        onChange={handleChange} 
         style={{ display: 'none' }} 
-        id="file-upload"
+        id="file-upload" 
         disabled={disabled}
       />
-      
-      <label htmlFor="file-upload" style={{ cursor: disabled ? 'not-allowed' : 'pointer', width: '100%', display: 'block' }}>
-        <div>
-          <div style={{ fontSize: '3rem', marginBottom: '10px' }}>
-              {isDragging ? '📂' : 'cloud_upload'}
-          </div>
-          <h3 style={{ fontSize: '1.2rem', marginBottom: '10px', color: '#333' }}>
-            {isDragging ? 'Rilascia il file qui!' : 'Clicca o trascina un file'}
-          </h3>
-          <p style={{ color: '#666', fontSize: '0.9rem' }}>
-            Video, Audio e Immagini supportati
-          </p>
+      <label htmlFor="file-upload" style={{ cursor: disabled ? 'not-allowed' : 'pointer', display: 'block' }}>
+        {/* Abbiamo sostituito la scritta corrotta con una emoji pulita */}
+        <div style={{ fontSize: '3.5rem', marginBottom: '15px', filter: disabled ? 'grayscale(1)' : 'none' }}>
+          📂
         </div>
+        <h3 style={{ margin: '0 0 5px 0', fontSize: '1.1rem', color: '#1e293b' }}>
+          Clicca o trascina un file
+        </h3>
+        <p style={{ margin: 0, fontSize: '0.9rem', color: '#64748b' }}>
+          Video, Audio e Immagini supportati
+        </p>
       </label>
     </div>
   );
-}
+};
