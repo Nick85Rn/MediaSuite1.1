@@ -58,7 +58,7 @@ if (typeof window === 'undefined') {
     if (navigator.serviceWorker) {
       navigator.serviceWorker.register(window.document.currentScript.src).then(
         (registration) => {
-            console.log("COI Service Worker registrato per sbloccare FFmpeg");
+            console.log("COI Service Worker registrato correttamente");
             registration.addEventListener("updatefound", () => {
                 window.location.reload();
             });
