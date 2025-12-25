@@ -1,13 +1,13 @@
 // src/App.tsx
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useWorker } from './hooks/useWorker';
 import { useFFmpeg } from './hooks/useFFmpeg';
 import { FileUploader } from './components/FileUploader';
 import { loadGoogleScripts, uploadToDrive, downloadLocally } from './lib/googleDrive';
-import { convertImageFile } from './lib/audioUtils'; 
+import { convertImageFile } from './lib/audioUtils';
+import { useToast } from './components/ToastProvider';
 import './App.css';
 
-// Funzioni helper
 function convertToSRT(chunks: any[]) {
   if (!chunks) return '';
   return chunks.map((chunk, index) => {
@@ -30,6 +30,7 @@ function formatTime(seconds: number) {
 function App() {
   const whisperWorker = useWorker();
   const ffmpegWorker = useFFmpeg();
+  const toast = useToast();
 
   const [mode, setMode] = useState<'transcribe' | 'convert_media' | 'convert_image'>('transcribe');
   const [modelType, setModelType] = useState<string>('Xenova/whisper-base');
@@ -44,20 +45,22 @@ function App() {
 
   useEffect(() => { loadGoogleScripts().catch(console.warn); }, []);
 
-  // HANDLER TRASCRIZIONE
-  const handleFileForTranscription = async (file: File) => {
+  // --- HANDLER ---
+
+  const handleFileForTranscription = useCallback(async (file: File) => {
     try {
+      toast.addToast(`Caricato: ${file.name}. Estrazione audio...`, "info");
       const audioData = await ffmpegWorker.processFile({ type: 'EXTRACT_AUDIO', file });
       whisperWorker.transcribe(audioData, modelType);
     } catch (e: any) {
-      alert("Errore estrazione audio: " + e.message);
+      toast.addToast("Errore estrazione audio: " + e.message, "error");
     }
-  };
+  }, [ffmpegWorker, whisperWorker, modelType, toast]);
 
-  // HANDLER CONVERSIONE MEDIA
-  const handleFileForMediaConversion = async (file: File) => {
+  const handleFileForMediaConversion = useCallback(async (file: File) => {
     if (!file) return;
     setIsWorking(true);
+    toast.addToast(`Conversione ${file.name} in corso...`, "info");
     try {
       const res = await ffmpegWorker.processFile({ 
         type: 'CONVERT', 
@@ -71,16 +74,16 @@ function App() {
         a.href = url;
         a.download = res.filename || 'download';
         a.click();
+        toast.addToast(`Fatto! Scaricato: ${res.filename}`, "success");
       }
     } catch (e: any) {
-      alert("Errore conversione: " + e.message);
+      toast.addToast("Errore conversione: " + e.message, "error");
     } finally {
       setIsWorking(false);
     }
-  };
+  }, [ffmpegWorker, mediaFormat, toast]);
 
-  // HANDLER IMMAGINI
-  const handleFileForImageConversion = async (file: File) => {
+  const handleFileForImageConversion = useCallback(async (file: File) => {
     if (!file) return;
     setIsWorking(true);
     try {
@@ -91,12 +94,13 @@ function App() {
       a.href = url;
       a.download = `immagine_${file.name.split('.')[0]}.${ext}`;
       a.click();
+      toast.addToast("Immagine convertita!", "success");
     } catch (e: any) {
-      alert("Errore immagine: " + e.message);
+      toast.addToast("Errore immagine: " + e.message, "error");
     } finally {
       setIsWorking(false);
     }
-  };
+  }, [imageFormat, toast]);
 
   const handleSaveAI = async (format: 'txt' | 'srt') => {
     if (!fullText) return;
@@ -108,9 +112,10 @@ function App() {
     const fileName = `Trascrizione_${timestamp}.${ext}`;
     try {
       await uploadToDrive(fileName, content);
-      alert(`✅ Salvato su Drive!`);
+      toast.addToast("Salvato su Drive!", "success");
     } catch (error) {
       downloadLocally(fileName, content);
+      toast.addToast("Salvato in locale.", "info");
     } finally {
       setIsSaving(false);
     }
@@ -119,7 +124,34 @@ function App() {
   const isFFmpegBusy = ffmpegWorker.status === 'loading';
   const isWhisperBusy = whisperWorker.status === 'loading' || whisperWorker.status === 'progress';
   const isBusy = isFFmpegBusy || isWhisperBusy || isWorking;
-  
+
+  // --- FEATURE CTRL+V (PASTE) ---
+  useEffect(() => {
+    const handlePaste = (event: ClipboardEvent) => {
+      if (isBusy) return; // Se sta lavorando, ignora il paste
+      
+      const items = event.clipboardData?.items;
+      if (!items) return;
+
+      for (const item of items) {
+        if (item.kind === 'file') {
+          const file = item.getAsFile();
+          if (file) {
+            console.log("File incollato:", file.name);
+            // Decide quale handler usare in base alla modalità attuale
+            if (mode === 'transcribe') handleFileForTranscription(file);
+            else if (mode === 'convert_media') handleFileForMediaConversion(file);
+            else if (mode === 'convert_image') handleFileForImageConversion(file);
+          }
+        }
+      }
+    };
+
+    window.addEventListener('paste', handlePaste);
+    return () => window.removeEventListener('paste', handlePaste);
+  }, [mode, isBusy, handleFileForTranscription, handleFileForMediaConversion, handleFileForImageConversion]);
+
+  // UI Helpers
   const getStatusMessage = () => {
     if (isFFmpegBusy) return ffmpegWorker.message;
     if (isWhisperBusy) return whisperWorker.message;
@@ -236,7 +268,6 @@ function App() {
 
         </main>
         
-        {/* FOOTER MODIFICATO */}
         <footer className="footer">
           <p>Powered by <strong>Nick85Rn</strong> 🚀</p>
         </footer>
