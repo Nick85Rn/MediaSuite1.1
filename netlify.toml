@@ -1,11 +1,3 @@
 [build]
   command = "npm run build"
   publish = "dist"
-
-# Configurazione Headers di Sicurezza (COOP/COEP)
-[[headers]]
-  for = "/*"
-  [headers.values]
-    Cross-Origin-Opener-Policy = "same-origin"
-    Cross-Origin-Embedder-Policy = "require-corp"
-    Cross-Origin-Resource-Policy = "cross-origin"
